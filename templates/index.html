@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三国演义策略检索系统</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#8B0000',
+                        secondary: '#F5F0E6',
+                    },
+                    fontFamily: {
+                        kai: ['KaiTi', 'STKaiti', 'SimKai', 'serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: "KaiTi", "STKaiti", "SimKai", serif;
+            background-image: url("/static/bg.jpg");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
+
+        .page-card {
+            background: rgba(255, 255, 255, 0.90);
+            backdrop-filter: blur(2px);
+        }
+
+        .title-card {
+            background: rgba(139, 0, 0, 0.92);
+            color: white;
+            letter-spacing: 0.18em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.45);
+        }
+
+        .loading-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .table-row-hover {
+            cursor: pointer;
+        }
+
+        .table-row-hover:hover {
+            background-color: #f8eaea;
+        }
+
+        .table-row-active {
+            background-color: #f8eaea;
+        }
+
+        .left-table-wrap {
+            height: 820px;
+        }
+
+        .table-content {
+            height: calc(100% - 3rem);
+            overflow-y: auto;
+        }
+
+        .detail-content {
+            word-break: break-all;
+            overflow-wrap: break-word;
+            line-height: 1.6;
+        }
+
+        .detail-content > div {
+            margin-bottom: 0.5rem;
+        }
+
+        table {
+            background: white;
+        }
+
+        .highlight-keyword {
+            background-color: #fff3a3;
+            color: #7f1d1d;
+            padding: 0 2px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .stat-chip {
+            display: inline-block;
+            margin: 0.15rem 0.25rem 0.15rem 0;
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            background: #f8eaea;
+            border: 1px solid rgba(139, 0, 0, 0.18);
+            color: #7f1d1d;
+            font-size: 0.95rem;
+        }
+
+        .related-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 0.45rem 0.6rem;
+            margin-top: 0.35rem;
+            border: 1px solid rgba(139, 0, 0, 0.18);
+            border-radius: 0.5rem;
+            background: rgba(255, 255, 255, 0.75);
+            transition: all 0.2s ease;
+        }
+
+        .related-item:hover {
+            background: #f8eaea;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen font-kai">
+    <div class="container mx-auto px-4 py-4 max-w-7xl">
+
+        <!-- 标题 -->
+        <header id="headerTitle" class="text-center mt-28 mb-12 transition-all duration-500">
+            <h1 class="inline-block text-4xl font-bold title-card px-8 py-3 rounded-lg shadow-lg">
+                三国演义策略检索系统
+            </h1>
+        </header>
+
+        <!-- 搜索区域 -->
+        <div id="searchSection" class="max-w-6xl mx-auto mb-10 transition-all duration-500">
+            <div class="search-card page-card rounded-lg shadow-lg p-8 border border-primary/20">
+                <form id="searchForm" class="space-y-6">
+
+                    <!-- 查询输入 -->
+                    <div>
+                        <label class="block text-gray-700 mb-3 text-xl font-medium">输入你的问题</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-2xl">
+                                <i class="fa fa-search"></i>
+                            </span>
+                            <input
+                                type="text"
+                                id="query"
+                                class="w-full pl-14 pr-5 py-4 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                                placeholder="语义检索：曹操如何获得政治优势？  布尔检索：曹操 AND 天子"
+                                required
+                            >
+                        </div>
+
+                        <!-- 检索历史 -->
+                        <div id="historyArea" class="hidden mt-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-gray-600">最近检索：</p>
+                                <button
+                                    type="button"
+                                    id="clearHistoryBtn"
+                                    class="text-sm text-primary hover:underline"
+                                >
+                                    清空历史
+                                </button>
+                            </div>
+                            <div id="historyList" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- 筛选区 -->
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                        <div>
+                            <label class="block text-gray-700 mb-3 text-lg font-medium">人物筛选</label>
+                            <select id="character" class="w-full px-5 py-4 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white">
+                                <option value="不限">不限</option>
+                                <option value="袁绍">袁绍</option>
+                                <option value="曹操">曹操</option>
+                                <option value="荀彧">荀彧</option>
+                                <option value="司马懿">司马懿</option>
+                                <option value="贾诩">贾诩</option>
+                                <option value="刘备">刘备</option>
+                                <option value="关羽">关羽</option>
+                                <option value="诸葛亮">诸葛亮</option>
+                                <option value="孙权">孙权</option>
+                                <option value="周瑜">周瑜</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-700 mb-3 text-lg font-medium">策略类型筛选</label>
+                            <select id="strategyType" class="w-full px-5 py-4 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white">
+                                <option value="不限">不限</option>
+                                <option value="政治合法性">政治合法性</option>
+                                <option value="权力控制">权力控制</option>
+                                <option value="联盟外交">联盟外交</option>
+                                <option value="人才任用">人才任用</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-700 mb-3 text-lg font-medium">检索范围</label>
+                            <select id="searchScope" class="w-full px-5 py-4 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white">
+                                <option value="全部字段">全部字段</option>
+                                <option value="原文片段">原文片段</option>
+                                <option value="事件">事件</option>
+                                <option value="解释摘要">解释摘要</option>
+                                <option value="关键词">关键词</option>
+                                <option value="具体策略">具体策略</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-700 mb-3 text-lg font-medium">检索模式</label>
+                            <select id="searchMode" class="w-full px-5 py-4 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white">
+                                <option value="语义检索">语义检索</option>
+                                <option value="布尔检索">简单布尔检索</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-700 mb-3 text-lg font-medium">返回结果数量</label>
+                            <select id="topK" class="w-full px-5 py-4 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white">
+                                <option value="5">前5条</option>
+                                <option value="10">前10条</option>
+                                <option value="all">全部</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 浏览式查询 -->
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-gray-700 text-lg font-medium">
+                                拓展检索方式
+                            </p>
+
+                            <button
+                                type="button"
+                                id="browseToggleBtn"
+                                class="px-4 py-2 border border-primary/40 rounded-lg text-primary hover:bg-primary hover:text-white transition"
+                            >
+                                展开浏览式查询
+                            </button>
+                        </div>
+
+                        <div id="browseSection" class="hidden bg-white/60 border border-primary/10 rounded-lg p-4">
+                            <p class="text-gray-600 mb-3 text-sm">
+                                浏览式查询适合用户暂时没有明确问题时，通过人物或策略类型快速进入相关结果。
+                            </p>
+
+                            <div class="mb-4">
+                                <span class="text-gray-600 mr-2">按人物浏览：</span>
+
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="曹操">曹操</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="刘备">刘备</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="诸葛亮">诸葛亮</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="孙权">孙权</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="司马懿">司马懿</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="袁绍">袁绍</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="周瑜">周瑜</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="贾诩">贾诩</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="荀彧">荀彧</button>
+                                <button type="button" class="browse-person px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-person="关羽">关羽</button>
+                            </div>
+
+                            <div>
+                                <span class="text-gray-600 mr-2">按策略类型浏览：</span>
+
+                                <button type="button" class="browse-type px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-type="政治合法性">政治合法性</button>
+                                <button type="button" class="browse-type px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-type="权力控制">权力控制</button>
+                                <button type="button" class="browse-type px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-type="联盟外交">联盟外交</button>
+                                <button type="button" class="browse-type px-3 py-1 m-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition" data-type="人才任用">人才任用</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 搜索按钮 -->
+                    <div class="text-center">
+                        <button
+                            type="submit"
+                            id="searchBtn"
+                            class="bg-primary hover:bg-primary/90 text-white font-bold py-4 px-12 rounded-lg shadow-md hover:shadow-lg text-lg transition-all duration-300 transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <i class="fa fa-search mr-2"></i>开始检索
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 状态区 -->
+        <div id="loadingArea" class="hidden text-center py-10 text-xl page-card rounded-lg shadow mt-6">
+            <i class="fa fa-spinner loading-spin text-primary mr-2"></i>正在检索中...
+        </div>
+
+        <div id="noResultsArea" class="hidden text-center py-10 text-xl text-gray-500 page-card rounded-lg shadow mt-6">
+            暂无匹配结果
+        </div>
+
+        <div id="errorArea" class="hidden text-center py-10 text-xl text-red-500 page-card rounded-lg shadow mt-6">
+            检索失败
+        </div>
+
+        <!-- 结果区域 -->
+        <div id="resultSection" class="hidden mt-6">
+
+            <!-- 结果统计 + 二次检索 -->
+            <div id="statsPanel" class="page-card rounded-lg shadow p-5 border border-gray-200 mb-6">
+                <h3 class="text-xl font-bold text-primary mb-3">结果统计</h3>
+                <div id="statsContent" class="text-gray-800"></div>
+
+                <div class="mt-4 border-t border-gray-200 pt-4">
+                    <label class="block text-gray-700 mb-2 text-lg font-medium">结果内检索</label>
+                    <div class="flex gap-3">
+                        <input
+                            type="text"
+                            id="refineQuery"
+                            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                            placeholder="例如：许都、汉献帝、联盟"
+                        >
+                        <button
+                            type="button"
+                            id="refineBtn"
+                            class="px-5 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+                        >
+                            二次检索
+                        </button>
+                        <button
+                            type="button"
+                            id="clearRefineBtn"
+                            class="px-5 py-3 border border-primary/40 text-primary rounded-lg hover:bg-primary hover:text-white transition"
+                        >
+                            清除
+                        </button>
+                    </div>
+                    <p id="refineInfo" class="text-sm text-gray-500 mt-2"></p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- 左侧结果表格 -->
+                <div class="lg:col-span-8 page-card rounded-lg shadow p-5 border border-gray-200 left-table-wrap">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-primary">检索列表</h3>
+
+                        <div class="flex items-center space-x-2">
+                            <button id="prevBtn" class="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50">上一页</button>
+                            <span id="pageInfo" class="text-gray-700">1/1</span>
+                            <button id="nextBtn" class="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50">下一页</button>
+
+                            <div class="flex items-center space-x-1 ml-2">
+                                <input type="number" id="jumpPage" class="w-12 px-1 py-1 border rounded text-center" min="1" placeholder="页">
+                                <button id="jumpBtn" class="px-2 py-1 border rounded hover:bg-gray-100">跳转</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-content">
+                        <table class="w-full text-left">
+                            <thead class="bg-primary text-white sticky top-0">
+                                <tr class="h-12">
+                                    <th class="px-4">排名</th>
+                                    <th class="px-4">回目</th>
+                                    <th class="px-4">人物</th>
+                                    <th class="px-4">策略大类</th>
+                                    <th class="px-4">具体策略</th>
+                                    <th class="px-4">事件</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 右侧详情 -->
+                <div class="lg:col-span-4 page-card rounded-lg shadow p-5 border border-gray-200">
+                    <h3 class="text-xl font-bold text-primary mb-4">详细信息</h3>
+                    <div id="detailPanel" class="detail-content pr-2 text-gray-800">
+                        <p class="text-gray-500">请点击左侧行查看详情</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const headerTitle = document.getElementById('headerTitle');
+            const searchSection = document.getElementById('searchSection');
+            const resultSection = document.getElementById('resultSection');
+            const tableBody = document.getElementById('tableBody');
+            const detailPanel = document.getElementById('detailPanel');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const pageInfo = document.getElementById('pageInfo');
+            const jumpPageInput = document.getElementById('jumpPage');
+            const jumpBtn = document.getElementById('jumpBtn');
+            const searchBtn = document.getElementById('searchBtn');
+            const statsContent = document.getElementById('statsContent');
+
+            const PAGE_SIZE = 5;
+
+            let allData = [];
+            let filteredData = [];
+            let currentPage = 1;
+            let activeRow = null;
+
+            let currentQuery = "";
+            let currentCharacter = "不限";
+            let currentStrategyType = "不限";
+            let currentSearchScope = "全部字段";
+            let currentSearchMode = "语义检索";
+
+            const personList = ["曹操", "刘备", "诸葛亮", "孙权", "司马懿", "袁绍", "周瑜", "贾诩", "荀彧", "关羽"];
+            const strategyList = ["政治合法性", "权力控制", "联盟外交", "人才任用"];
+            const extraHighlightWords = ["政治优势", "三顾茅庐", "孙刘联盟", "外交", "权力", "合法性", "人才", "联盟", "天子", "许都", "朝廷", "魏王", "汉献帝"];
+
+            initSearchHistory();
+
+            const browseToggleBtn = document.getElementById('browseToggleBtn');
+            const browseSection = document.getElementById('browseSection');
+
+            browseToggleBtn.addEventListener('click', () => {
+                browseSection.classList.toggle('hidden');
+
+                if (browseSection.classList.contains('hidden')) {
+                    browseToggleBtn.textContent = '展开浏览式查询';
+                } else {
+                    browseToggleBtn.textContent = '收起浏览式查询';
+                }
+            });
+
+            document.querySelectorAll('.browse-person').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const person = btn.dataset.person;
+
+                    document.getElementById('query').value = person + " 有哪些政治策略？";
+                    document.getElementById('character').value = person;
+                    document.getElementById('strategyType').value = "不限";
+                    document.getElementById('searchScope').value = "全部字段";
+                    document.getElementById('searchMode').value = "语义检索";
+                    document.getElementById('topK').value = "10";
+
+                    document.getElementById('searchForm').requestSubmit();
+                });
+            });
+
+            document.querySelectorAll('.browse-type').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const type = btn.dataset.type;
+
+                    document.getElementById('query').value = type + " 相关策略";
+                    document.getElementById('character').value = "不限";
+                    document.getElementById('strategyType').value = type;
+                    document.getElementById('searchScope').value = "全部字段";
+                    document.getElementById('searchMode').value = "语义检索";
+                    document.getElementById('topK').value = "10";
+
+                    document.getElementById('searchForm').requestSubmit();
+                });
+            });
+
+            document.getElementById('searchForm').addEventListener('submit', async e => {
+                e.preventDefault();
+
+                const query = document.getElementById('query').value.trim();
+                const character = document.getElementById('character').value;
+                const strategyType = document.getElementById('strategyType').value;
+                const searchScope = document.getElementById('searchScope').value;
+                const searchMode = document.getElementById('searchMode').value;
+                const topK = document.getElementById('topK').value;
+
+                currentQuery = query;
+                currentCharacter = character;
+                currentStrategyType = strategyType;
+                currentSearchScope = searchScope;
+                currentSearchMode = searchMode;
+
+                addSearchHistory(query);
+
+                headerTitle.classList.remove('mt-28', 'mb-12');
+                headerTitle.classList.add('mt-2', 'mb-2');
+
+                const title = headerTitle.querySelector('h1');
+                title.classList.remove('text-4xl');
+                title.classList.add('text-xl');
+                title.classList.remove('px-8', 'py-3');
+                title.classList.add('px-5', 'py-2');
+
+                searchSection.classList.remove('mb-10');
+                searchSection.classList.add('mb-4');
+
+                const searchCard = searchSection.querySelector('.search-card');
+                if (searchCard) {
+                    searchCard.classList.remove('p-8');
+                    searchCard.classList.add('p-4');
+                }
+
+                document.getElementById('loadingArea').classList.remove('hidden');
+                resultSection.classList.add('hidden');
+                document.getElementById('noResultsArea').classList.add('hidden');
+                document.getElementById('errorArea').classList.add('hidden');
+                searchBtn.disabled = true;
+
+                try {
+                    const res = await fetch('/api/search', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            query: query,
+                            character: character,
+                            strategyType: strategyType,
+                            searchScope: searchScope,
+                            searchMode: searchMode,
+                            topK: topK === 'all' ? 1000 : parseInt(topK)
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.status === 'success' && data.data.length) {
+                        allData = data.data;
+                        filteredData = [...allData];
+                        currentPage = 1;
+                        activeRow = null;
+
+                        document.getElementById('refineQuery').value = "";
+                        document.getElementById('refineInfo').textContent = "";
+
+                        renderStatsPanel();
+                        renderPage();
+                        resultSection.classList.remove('hidden');
+                    } else {
+                        document.getElementById('noResultsArea').classList.remove('hidden');
+                    }
+
+                } catch (err) {
+                    document.getElementById('errorArea').classList.remove('hidden');
+                } finally {
+                    document.getElementById('loadingArea').classList.add('hidden');
+                    searchBtn.disabled = false;
+                }
+            });
+
+            document.getElementById('refineBtn').addEventListener('click', () => {
+                applyRefineSearch();
+            });
+
+            document.getElementById('refineQuery').addEventListener('keydown', e => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyRefineSearch();
+                }
+            });
+
+            document.getElementById('clearRefineBtn').addEventListener('click', () => {
+                document.getElementById('refineQuery').value = "";
+                filteredData = [...allData];
+                currentPage = 1;
+                document.getElementById('refineInfo').textContent = "";
+
+                renderStatsPanel();
+                renderPage();
+            });
+
+            prevBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderPage();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderPage();
+                }
+            });
+
+            jumpBtn.addEventListener('click', () => {
+                const targetPage = parseInt(jumpPageInput.value);
+                const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+
+                if (targetPage >= 1 && targetPage <= totalPages) {
+                    currentPage = targetPage;
+                    renderPage();
+                }
+            });
+
+            function applyRefineSearch() {
+                const refineQuery = document.getElementById('refineQuery').value.trim();
+
+                if (!refineQuery) {
+                    filteredData = [...allData];
+                    currentPage = 1;
+                    document.getElementById('refineInfo').textContent = "";
+                    renderStatsPanel();
+                    renderPage();
+                    return;
+                }
+
+                filteredData = allData.filter(item => {
+                    const text = [
+                        item.chapter,
+                        item.main_person,
+                        item.related_persons,
+                        item.strategy_type,
+                        item.strategy_method,
+                        item.event,
+                        item.text,
+                        item.summary
+                    ].join(" ");
+
+                    return text.includes(refineQuery);
+                });
+
+                currentPage = 1;
+
+                document.getElementById('refineInfo').textContent =
+                    `已在 ${allData.length} 条结果中筛选出 ${filteredData.length} 条包含“${refineQuery}”的结果。`;
+
+                renderStatsPanel();
+                renderPage();
+            }
+
+            function formatValue(value) {
+                if (value === null || value === undefined || value === '') {
+                    return '';
+                }
+
+                return value;
+            }
+
+            function escapeHTML(text) {
+                return String(formatValue(text))
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function escapeRegExp(text) {
+                return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
+            function splitQueryTerms(query) {
+                return String(query)
+                    .replace(/\bAND\b/gi, " ")
+                    .replace(/\bOR\b/gi, " ")
+                    .replace(/\bNOT\b/gi, " ")
+                    .replace(/[，。！？、；：,.!?;:（）()《》“”"']/g, " ")
+                    .split(/\s+/)
+                    .map(t => t.trim())
+                    .filter(t => t.length >= 2);
+            }
+
+            function getHighlightTerms() {
+                let terms = [];
+
+                if (currentCharacter !== "不限") {
+                    terms.push(currentCharacter);
+                }
+
+                if (currentStrategyType !== "不限") {
+                    terms.push(currentStrategyType);
+                }
+
+                personList.forEach(person => {
+                    if (currentQuery.includes(person)) {
+                        terms.push(person);
+                    }
+                });
+
+                strategyList.forEach(type => {
+                    if (currentQuery.includes(type)) {
+                        terms.push(type);
+                    }
+                });
+
+                extraHighlightWords.forEach(word => {
+                    if (currentQuery.includes(word)) {
+                        terms.push(word);
+                    }
+                });
+
+                splitQueryTerms(currentQuery).forEach(term => {
+                    terms.push(term);
+                });
+
+                const refineQuery = document.getElementById('refineQuery')?.value.trim();
+
+                if (refineQuery) {
+                    terms.push(refineQuery);
+                }
+
+                terms = [...new Set(terms)].filter(term => term && term.length >= 2);
+                terms.sort((a, b) => b.length - a.length);
+
+                return terms;
+            }
+
+            function highlightText(text) {
+                let safeText = escapeHTML(text);
+                const terms = getHighlightTerms();
+
+                terms.forEach(term => {
+                    const safeTerm = escapeHTML(term);
+                    const reg = new RegExp(escapeRegExp(safeTerm), "g");
+                    safeText = safeText.replace(reg, `<span class="highlight-keyword">${safeTerm}</span>`);
+                });
+
+                return safeText;
+            }
+
+            function getItemKey(item) {
+                return `${formatValue(item.rank)}_${formatValue(item.chapter)}_${formatValue(item.event)}`;
+            }
+
+            function initSearchHistory() {
+                renderSearchHistory();
+
+                document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+                    localStorage.removeItem('sanguoSearchHistory');
+                    renderSearchHistory();
+                });
+            }
+
+            function getSearchHistory() {
+                try {
+                    return JSON.parse(localStorage.getItem('sanguoSearchHistory')) || [];
+                } catch {
+                    return [];
+                }
+            }
+
+            function saveSearchHistory(history) {
+                localStorage.setItem('sanguoSearchHistory', JSON.stringify(history.slice(0, 6)));
+            }
+
+            function addSearchHistory(query) {
+                if (!query) return;
+
+                let history = getSearchHistory();
+                history = history.filter(item => item !== query);
+                history.unshift(query);
+
+                saveSearchHistory(history);
+                renderSearchHistory();
+            }
+
+            function renderSearchHistory() {
+                const historyArea = document.getElementById('historyArea');
+                const historyList = document.getElementById('historyList');
+                const history = getSearchHistory();
+
+                historyList.innerHTML = '';
+
+                if (history.length === 0) {
+                    historyArea.classList.add('hidden');
+                    return;
+                }
+
+                historyArea.classList.remove('hidden');
+
+                history.forEach(query => {
+                    const btn = document.createElement('button');
+                    btn.type = "button";
+                    btn.className = "px-3 py-1 bg-secondary border border-primary/30 rounded hover:bg-primary hover:text-white transition";
+                    btn.textContent = query;
+
+                    btn.addEventListener('click', () => {
+                        document.getElementById('query').value = query;
+                        document.getElementById('searchForm').requestSubmit();
+                    });
+
+                    historyList.appendChild(btn);
+                });
+            }
+
+            function renderStatsPanel() {
+                const total = filteredData.length;
+                const originalTotal = allData.length;
+
+                const avgScore = total > 0
+                    ? (filteredData.reduce((sum, item) => sum + parseFloat(item.final_score || 0), 0) / total).toFixed(3)
+                    : "0";
+
+                const personCounts = countByField(filteredData, "main_person");
+                const typeCounts = countByField(filteredData, "strategy_type");
+
+                statsContent.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
+                        <div>
+                            <b>当前结果数：</b>${total} 条 / 原始 ${originalTotal} 条
+                        </div>
+                        <div>
+                            <b>检索模式：</b>${escapeHTML(currentSearchMode)}
+                        </div>
+                        <div>
+                            <b>检索范围：</b>${escapeHTML(currentSearchScope)}
+                        </div>
+                        <div>
+                            <b>平均最终得分：</b>${avgScore}
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <b>人物分布：</b>
+                        ${renderCountChips(personCounts)}
+                    </div>
+
+                    <div>
+                        <b>策略类型分布：</b>
+                        ${renderCountChips(typeCounts)}
+                    </div>
+                `;
+            }
+
+            function countByField(data, field) {
+                const counts = {};
+
+                data.forEach(item => {
+                    const value = item[field] || "未标注";
+                    counts[value] = (counts[value] || 0) + 1;
+                });
+
+                return counts;
+            }
+
+            function renderCountChips(counts) {
+                return Object.entries(counts)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([key, count]) => `<span class="stat-chip">${escapeHTML(key)}：${count}</span>`)
+                    .join("");
+            }
+
+            function renderPage() {
+                const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+                const start = (currentPage - 1) * PAGE_SIZE;
+                const pageData = filteredData.slice(start, start + PAGE_SIZE);
+
+                pageInfo.textContent = `${currentPage}/${totalPages}`;
+                prevBtn.disabled = currentPage === 1;
+                nextBtn.disabled = currentPage === totalPages;
+                jumpPageInput.max = totalPages;
+                jumpPageInput.value = '';
+
+                tableBody.innerHTML = '';
+
+                if (pageData.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="py-6 px-4 text-center text-gray-500">
+                                当前结果内没有匹配内容
+                            </td>
+                        </tr>
+                    `;
+
+                    detailPanel.innerHTML = '<p class="text-gray-500">暂无可查看详情</p>';
+                    return;
+                }
+
+                pageData.forEach((item, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-gray-200 table-row-hover';
+
+                    tr.innerHTML = `
+                        <td class="py-3 px-4">${start + idx + 1}</td>
+                        <td class="py-3 px-4">${escapeHTML(item.chapter || '-')}</td>
+                        <td class="py-3 px-4">${escapeHTML(item.main_person || '-')}</td>
+                        <td class="py-3 px-4">${escapeHTML(item.strategy_type || '-')}</td>
+                        <td class="py-3 px-4">${escapeHTML(item.strategy_method || '-')}</td>
+                        <td class="py-3 px-4">${escapeHTML(item.event || '-')}</td>
+                    `;
+
+                    tr.addEventListener('click', () => {
+                        if (activeRow) {
+                            activeRow.classList.remove('table-row-active');
+                        }
+
+                        tr.classList.add('table-row-active');
+                        activeRow = tr;
+                        showDetail(item);
+                    });
+
+                    tableBody.appendChild(tr);
+                });
+
+                detailPanel.innerHTML = '<p class="text-gray-500">请点击左侧行查看详情</p>';
+                activeRow = null;
+            }
+
+            function getScoreExplanation(item) {
+                const semantic = parseFloat(item.semantic_score || 0);
+                const person = parseFloat(item.person_score || 0);
+                const theme = parseFloat(item.theme_score || 0);
+                const field = parseFloat(item.field_score || 0);
+
+                let reasons = [];
+
+                if (currentSearchMode === "布尔检索") {
+                    reasons.push("当前使用简单布尔检索模式，系统优先返回满足 AND / OR / NOT 条件的结果");
+                } else if (semantic >= 0.6) {
+                    reasons.push("语义相似度较高，说明用户问题与该片段内容比较接近");
+                } else if (semantic >= 0.5) {
+                    reasons.push("语义相似度中等，说明该片段与问题存在一定关联");
+                } else {
+                    reasons.push("语义相似度较低，但该片段可能因为人物、策略类型或字段匹配而被保留");
+                }
+
+                if (person === 1) {
+                    reasons.push("主导人物与筛选人物完全匹配");
+                } else if (person === 0.6) {
+                    reasons.push("筛选人物出现在相关人物中");
+                } else if (person === 0.5) {
+                    reasons.push("未限制人物，因此人物匹配分采用默认值");
+                } else if (person === 0) {
+                    reasons.push("人物与筛选条件不完全匹配");
+                }
+
+                if (theme === 1) {
+                    reasons.push("策略类型与筛选条件完全匹配");
+                } else if (theme === 0.5) {
+                    reasons.push("未限制策略类型，因此策略匹配分采用默认值");
+                } else if (theme === 0) {
+                    reasons.push("策略类型与筛选条件不完全匹配");
+                }
+
+                if (currentSearchScope === "全部字段") {
+                    reasons.push("当前未限制检索范围，字段匹配分采用默认值");
+                } else if (field > 0) {
+                    reasons.push("该结果在用户指定的检索范围中命中了部分查询词");
+                } else {
+                    reasons.push("该结果在指定检索范围中的词面匹配较弱");
+                }
+
+                return reasons.join("；") + "。";
+            }
+
+            function getRelatedRecords(item) {
+                const currentKey = getItemKey(item);
+
+                let related = filteredData.filter(other => {
+                    if (getItemKey(other) === currentKey) {
+                        return false;
+                    }
+
+                    const samePerson = other.main_person && other.main_person === item.main_person;
+                    const sameType = other.strategy_type && other.strategy_type === item.strategy_type;
+
+                    return samePerson || sameType;
+                });
+
+                related = related.sort((a, b) => parseFloat(b.final_score || 0) - parseFloat(a.final_score || 0));
+
+                return related.slice(0, 3);
+            }
+
+            function renderRelatedRecords(item) {
+                const related = getRelatedRecords(item);
+
+                if (related.length === 0) {
+                    return `<p class="text-gray-500 text-sm mt-2">暂无相关记录</p>`;
+                }
+
+                return related.map((record, index) => {
+                    return `
+                        <button type="button" class="related-item" data-related-index="${index}">
+                            <b>${escapeHTML(record.event || "未命名事件")}</b><br>
+                            <span class="text-sm text-gray-600">
+                                ${escapeHTML(record.chapter || "")}｜${escapeHTML(record.main_person || "")}｜${escapeHTML(record.strategy_type || "")}
+                            </span>
+                        </button>
+                    `;
+                }).join("");
+            }
+
+            function showDetail(item) {
+                detailPanel.innerHTML = `
+                    <div><b>排名：</b>${escapeHTML(formatValue(item.rank))}</div>
+                    <div><b>回目：</b>${escapeHTML(formatValue(item.chapter))}</div>
+                    <div><b>人物：</b>${highlightText(item.main_person)}</div>
+                    <div><b>相关人物：</b>${highlightText(item.related_persons)}</div>
+                    <div><b>策略大类：</b>${highlightText(item.strategy_type)}</div>
+                    <div><b>具体策略：</b>${highlightText(item.strategy_method)}</div>
+                    <div><b>事件：</b>${highlightText(item.event)}</div>
+
+                    <div>
+                        <b>解释：</b><br>
+                        ${highlightText(item.summary)}
+                    </div>
+
+                    <div>
+                        <b>原文：</b><br>
+                        ${highlightText(item.text)}
+                    </div>
+
+                    <div class="mt-3 p-3 bg-red-50 border border-primary/20 rounded">
+                        <b>排序依据：</b><br>
+                        语义相似度 / 布尔匹配分：${escapeHTML(formatValue(item.semantic_score))}<br>
+                        人物匹配分：${escapeHTML(formatValue(item.person_score))}<br>
+                        策略匹配分：${escapeHTML(formatValue(item.theme_score))}<br>
+                        字段匹配分：${escapeHTML(formatValue(item.field_score))}<br>
+                        最终得分：${escapeHTML(formatValue(item.final_score))}<br>
+                        <span class="text-gray-600">${escapeHTML(getScoreExplanation(item))}</span>
+                    </div>
+
+                    <div class="mt-3 p-3 bg-white/70 border border-gray-200 rounded">
+                        <b>相关记录推荐：</b>
+                        <div id="relatedRecordsArea">
+                            ${renderRelatedRecords(item)}
+                        </div>
+                    </div>
+                `;
+
+                const related = getRelatedRecords(item);
+
+                document.querySelectorAll('.related-item').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const index = parseInt(btn.dataset.relatedIndex);
+                        const selected = related[index];
+
+                        if (selected) {
+                            showDetail(selected);
+                        }
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>
